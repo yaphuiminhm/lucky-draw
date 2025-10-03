@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Lucky Draw Game</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background: #f5f5f5;
+      padding: 20px;
+    }
+    h1 { color: #333; }
+    #playersList {
+      margin: 20px auto;
+      padding: 10px;
+      background: #fff;
+      border-radius: 10px;
+      width: 300px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      text-align: left;
+    }
+    #winnerBox {
+      margin-top: 20px;
+      font-size: 1.2em;
+      font-weight: bold;
+      color: green;
+    }
+    input, button {
+      padding: 10px;
+      margin: 5px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      font-size: 14px;
+    }
+    button {
+      background: #4CAF50;
+      color: white;
+      cursor: pointer;
+    }
+    button:disabled {
+      background: gray;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎉 Lucky Draw Game 🎉</h1>
+
+  <!-- 输入名字 -->
+  <input type="text" id="username" placeholder="Enter your name"/>
+  <button onclick="joinGame()">Join</button>
+
+  <!-- 玩家列表 -->
+  <h3>Players Joined:</h3>
+  <ul id="playersList"></ul>
+
+  <!-- 主持人按钮 -->
+  <button id="startBtn" onclick="startDraw()" disabled>Start Draw</button>
+
+  <!-- 赢家结果 -->
+  <div id="winnerBox"></div>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js"></script>
+
+  <script>
+    // ✅ 你提供的 Firebase 配置
+    const firebaseConfig = {
+      apiKey: "AIzaSyA8sX8aPIcTpHuvWjUuLxhqKCajye569is",
+      authDomain: "luckydraw-8899c.firebaseapp.com",
+      databaseURL: "https://luckydraw-8899c-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "luckydraw-8899c",
+      storageBucket: "luckydraw-8899c.firebasestorage.app",
+      messagingSenderId: "191119108641",
+      appId: "1:191119108641:web:39a9e3a2b52140b9515160",
+      measurementId: "G-MVX5LMXPLY"
+    };
+
+    // 初始化 Firebase
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    const playersRef = db.ref("players");
+    const winnerRef = db.ref("winner");
+
+    let currentPlayers = [];
+
+    // 玩家加入
+    function joinGame() {
+      const name = document.getElementById("username").value.trim();
+      if (!name) {
+        alert("Please enter your name!");
+        return;
+      }
+
+      // 检查是否已经存在
+      if (currentPlayers.includes(name)) {
+        alert("This name is already taken!");
+        return;
+      }
+
+      playersRef.push(name);
+      document.getElementById("username").value = "";
+    }
+
+    // 实时监听玩家列表
+    playersRef.on("value", (snapshot) => {
+      const data = snapshot.val() || {};
+      currentPlayers = Object.values(data);
+      updatePlayerList(currentPlayers);
+
+      // 如果人数 >=5，主持人可以启用开始按钮
+      document.getElementById("startBtn").disabled = currentPlayers.length < 5;
+    });
+
+    function updatePlayerList(players) {
+      const list = document.getElementById("playersList");
+      list.innerHTML = "";
+      players.forEach((p) => {
+        const li = document.createElement("li");
+        li.textContent = p;
+        list.appendChild(li);
+      });
+    }
+
+    // 主持人点击开始抽奖
+    function startDraw() {
+      if (currentPlayers.length < 5) {
+        alert("Need at least 5 players to start!");
+        return;
+      }
+      const randomIndex = Math.floor(Math.random() * currentPlayers.length);
+      const winner = currentPlayers[randomIndex];
+
+      // 将赢家写入 Firebase（所有人都会同步看到）
+      winnerRef.set(winner);
+    }
+
+    // 监听赢家结果
+    winnerRef.on("value", (snapshot) => {
+      const winner = snapshot.val();
+      if (winner) {
+        document.getElementById("winnerBox").innerText = "🏆 Winner: " + winner + " 🎉";
+      }
+    });
+  </script>
+</body>
+</html>
