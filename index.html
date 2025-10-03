@@ -11,37 +11,21 @@
       padding: 40px 20px;
       background: linear-gradient(135deg, #f9f9f9, #e3f2fd);
     }
-    h2 {
-      font-size: 28px;
-      margin-bottom: 15px;
-      color: #333;
+    h2 { font-size: 28px; margin-bottom: 15px; color: #333; }
+    input {
+      padding: 10px; margin: 5px; border: 1px solid #ccc;
+      border-radius: 8px; font-size: 16px; width: 200px;
     }
-    p {
-      font-size: 18px;
-      margin-bottom: 25px;
-      color: #555;
-    }
-    button {
-      padding: 15px 35px;
-      font-size: 20px;
-      font-weight: bold;
-      border: none;
-      border-radius: 12px;
-      cursor: pointer;
-      background-color: #42a5f5;
+    .setup, .game { margin-top: 20px; }
+    .host-controls button, .players button {
+      padding: 12px 25px; font-size: 18px; font-weight: bold;
+      border: none; border-radius: 10px; margin: 5px; cursor: pointer;
       color: white;
-      transition: 0.2s;
     }
-    button:hover {
-      background-color: #1e88e5;
-    }
-    .result {
-      margin-top: 30px;
-      font-size: 26px;
-      font-weight: bold;
-      color: #222;
-      min-height: 50px;
-    }
+    .host-controls button { background-color: #8e24aa; }
+    .players button { background-color: #42a5f5; }
+    button:disabled { background-color: #aaa; cursor: not-allowed; }
+    .result { margin-top: 30px; font-size: 22px; font-weight: bold; min-height: 30px; }
     .winner { color: #2e7d32; }
     .loser { color: #c62828; }
     .end { color: #6a1b9a; }
@@ -49,41 +33,96 @@
 </head>
 <body>
   <h2>🎉 Lucky Draw 🎉</h2>
-  <p>Click the button to see your result!</p>
-  <button onclick="draw()">Try Your Luck</button>
-  <div class="result" id="result"></div>
+
+  <!-- 游戏前的角色选择 -->
+  <div class="setup" id="setup">
+    <h3>请输入名字并选择身份</h3>
+    <input id="username" placeholder="Your Name" />
+    <br>
+    <button onclick="setRole('host')">我是主导人</button>
+    <button onclick="setRole('player')">我是玩家</button>
+  </div>
+
+  <!-- 游戏区 -->
+  <div class="game" id="game" style="display:none;">
+    <div id="hostArea" style="display:none;">
+      <h3>🎤 主导人控制区</h3>
+      <div class="host-controls">
+        <button id="startBtn" onclick="startGame()">▶️ Start Game</button>
+        <button id="resetBtn" onclick="resetGame()" disabled>🔄 Reset</button>
+      </div>
+    </div>
+
+    <div id="playerArea" style="display:none;">
+      <h3>🎮 玩家区</h3>
+      <button id="playerBtn" onclick="draw()" disabled>抽奖</button>
+    </div>
+
+    <div class="result" id="result">👉 等主导人点击 “Start” 开始抽奖</div>
+  </div>
 
   <script>
-    let players = 8;   // 总人数 (改成 8)
-    let picked = 0;    
-    let winnerIndex = Math.floor(Math.random() * players); // 随机赢家 (0~7)
+    let role = "";       // host / player
+    let username = "";   // 玩家名字
+    let winnerIndex;     
+    let players = [];    // 存玩家名字
+    let started = false; 
 
-    function draw() {
-      if (picked >= players) {
-        document.getElementById("result").innerHTML = "⚠️ Game Over!";
-        document.getElementById("result").className = "result end";
+    function setRole(selectedRole) {
+      username = document.getElementById("username").value.trim();
+      if (!username) { alert("请输入名字"); return; }
+      role = selectedRole;
+      document.getElementById("setup").style.display = "none";
+      document.getElementById("game").style.display = "block";
+
+      if (role === "host") {
+        document.getElementById("hostArea").style.display = "block";
+        document.getElementById("result").innerHTML = "👉 等主导人点击 Start";
+      } else {
+        document.getElementById("playerArea").style.display = "block";
+        document.getElementById("playerBtn").innerText = username + " 抽奖";
+        players.push(username);
+      }
+    }
+
+    function startGame() {
+      if (players.length < 2) {
+        alert("至少需要 2 个玩家");
         return;
       }
+      winnerIndex = Math.floor(Math.random() * players.length);
+      started = true;
+      document.getElementById("result").innerHTML = "🎯 游戏开始！请玩家抽奖";
+      document.getElementById("startBtn").disabled = true;
+      document.getElementById("resetBtn").disabled = true;
+      // 激活所有玩家按钮
+      document.querySelectorAll("#playerArea button").forEach(btn => btn.disabled = false);
+    }
 
-      if (picked === winnerIndex) {
-        document.getElementById("result").innerHTML = "🎉 Congrats! This is yours!";
+    function draw() {
+      if (!started) return;
+      let btn = document.getElementById("playerBtn");
+      btn.disabled = true; // 玩家只能抽一次
+      let idx = players.indexOf(username);
+
+      if (idx === winnerIndex) {
+        document.getElementById("result").innerHTML = `🎉 ${username} Wins!`;
         document.getElementById("result").className = "result winner";
+        started = false;
+        document.getElementById("resetBtn").disabled = false; // 主导人可以重置
       } else {
-        document.getElementById("result").innerHTML = "🙏 Thank you! And Next!";
+        document.getElementById("result").innerHTML = `🙏 ${username} 谢谢参与！`;
         document.getElementById("result").className = "result loser";
       }
+    }
 
-      picked++;
-
-      if (picked < players) {
-        document.getElementById("status").innerText = `Player ${picked+1}, click the button!`;
-      } else {
-        document.getElementById("status").innerText = "✅ All players have played.";
-        document.getElementById("btn").disabled = true; // 一轮结束后按钮失效
-        document.getElementById("result").className = "result end";
-      }
+    function resetGame() {
+      document.getElementById("result").innerHTML = "👉 等主导人点击 Start";
+      document.getElementById("result").className = "result";
+      started = false;
+      document.getElementById("startBtn").disabled = false;
+      document.getElementById("resetBtn").disabled = true;
     }
   </script>
 </body>
-
 </html>
