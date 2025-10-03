@@ -1,193 +1,151 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Lucky Draw Game (Realtime)</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Lucky Draw Game</title>
   <style>
     body {
       font-family: Arial, sans-serif;
       text-align: center;
-      padding: 40px 20px;
-      background: linear-gradient(135deg, #f9f9f9, #e3f2fd);
+      background: #f5f5f5;
+      padding: 20px;
     }
-    h2 { font-size: 28px; margin-bottom: 15px; color: #333; }
-    input {
-      padding: 10px; margin: 5px; border: 1px solid #ccc;
-      border-radius: 8px; font-size: 16px; width: 200px;
+    h1 { color: #333; }
+    #playersList {
+      margin: 20px auto;
+      padding: 10px;
+      background: #fff;
+      border-radius: 10px;
+      width: 300px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      text-align: left;
+    }
+    #winnerBox {
+      margin-top: 20px;
+      font-size: 1.2em;
+      font-weight: bold;
+      color: green;
+    }
+    input, button {
+      padding: 10px;
+      margin: 5px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      font-size: 14px;
     }
     button {
-      padding: 12px 25px; font-size: 18px; font-weight: bold;
-      border: none; border-radius: 10px; margin: 5px; cursor: pointer;
-      color: white; background-color: #42a5f5;
+      background: #4CAF50;
+      color: white;
+      cursor: pointer;
     }
-    button:disabled { background-color: #aaa; cursor: not-allowed; }
-    .setup, .game, .lobby { margin-top: 20px; }
-    .host-controls button { background-color: #8e24aa; }
-    .result { margin-top: 30px; font-size: 22px; font-weight: bold; min-height: 30px; }
-    .winner { color: #2e7d32; }
-    .loser { color: #c62828; }
-    .player-list {
-      margin-top: 15px; font-size: 18px; text-align: left;
-      display: inline-block; background: #fff; padding: 15px 20px;
-      border-radius: 12px; box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+    button:disabled {
+      background: gray;
+      cursor: not-allowed;
     }
-    .player-list h4 { margin: 0 0 10px 0; }
   </style>
 </head>
 <body>
-  <h2>🎉 Lucky Draw Game 🎉</h2>
+  <h1>🎉 Lucky Draw Game 🎉</h1>
 
-  <!-- Before Game: Choose Role -->
-  <div class="setup" id="setup">
-    <h3>Enter your name and choose a role</h3>
-    <input id="username" placeholder="Your Name" />
-    <br>
-    <button onclick="setRole('host')">I am the Host</button>
-    <button onclick="setRole('player')">I am a Player</button>
-  </div>
+  <!-- 输入名字 -->
+  <input type="text" id="username" placeholder="Enter your name"/>
+  <button onclick="joinGame()">Join</button>
 
-  <!-- Lobby -->
-  <div class="lobby" id="lobby" style="display:none;">
-    <h3>Game Lobby</h3>
-    <div class="player-list" id="playerList">No players joined yet...</div>
-  </div>
+  <!-- 玩家列表 -->
+  <h3>Players Joined:</h3>
+  <ul id="playersList"></ul>
 
-  <!-- Game Area -->
-  <div class="game" id="game" style="display:none;">
-    <div id="hostArea" style="display:none;">
-      <h3>🎤 Host Controls</h3>
-      <div class="host-controls">
-        <button id="startBtn" onclick="startGame()" disabled>▶️ Start Game</button>
-        <button id="resetBtn" onclick="resetGame()" disabled>🔄 Reset</button>
-      </div>
-    </div>
+  <!-- 主持人按钮 -->
+  <button id="startBtn" onclick="startDraw()" disabled>Start Draw</button>
 
-    <div id="playerArea" style="display:none;">
-      <h3>🎮 Player Zone</h3>
-      <button id="playerBtn" onclick="draw()" disabled>Draw</button>
-    </div>
-
-    <div class="result" id="result">👉 Waiting for host to click “Start”</div>
-  </div>
+  <!-- 赢家结果 -->
+  <div id="winnerBox"></div>
 
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js"></script>
 
   <script>
-    // 🔑 TODO: replace with your Firebase config (from Firebase Console)
-    const firebaseConfig = {
-      apiKey: "YOUR_KEY",
-      authDomain: "YOUR_APP.firebaseapp.com",
-      databaseURL: "https://YOUR_APP.firebaseio.com",
-      projectId: "YOUR_APP",
-      storageBucket: "YOUR_APP.appspot.com",
-      messagingSenderId: "123456789",
-      appId: "1:123456789:web:xxxxxx"
-    };
+    // ⚡ 替换成你自己的 Firebase 配置
+ const firebaseConfig = {
+  apiKey: "AIzaSyA8sX8aPIcTpHuvWjUuLxhqKCajye569is",
+  authDomain: "luckydraw-8899c.firebaseapp.com",
+  databaseURL: "https://luckydraw-8899c-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "luckydraw-8899c",
+  storageBucket: "luckydraw-8899c.firebasestorage.app",
+  messagingSenderId: "191119108641",
+  appId: "1:191119108641:web:39a9e3a2b52140b9515160",
+  measurementId: "G-MVX5LMXPLY"
+};
+
+    // 初始化 Firebase
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    let role = "";
-    let username = "";
-    let winnerIndex;
-    let started = false;
+    const playersRef = db.ref("players");
+    const winnerRef = db.ref("winner");
 
-    function setRole(selectedRole) {
-      username = document.getElementById("username").value.trim();
-      if (!username) { alert("Please enter your name"); return; }
-      role = selectedRole;
+    let currentPlayers = [];
 
-      document.getElementById("setup").style.display = "none";
-      document.getElementById("lobby").style.display = "block";
-      document.getElementById("game").style.display = "block";
-
-      if (role === "host") {
-        document.getElementById("hostArea").style.display = "block";
-      } else {
-        document.getElementById("playerArea").style.display = "block";
-        document.getElementById("playerBtn").innerText = username + " - Draw";
+    // 玩家加入
+    function joinGame() {
+      const name = document.getElementById("username").value.trim();
+      if (!name) {
+        alert("Please enter your name!");
+        return;
       }
 
-      // Add player to Firebase
-      db.ref("players/" + username).set({name: username});
+      // 检查是否已经存在
+      if (currentPlayers.includes(name)) {
+        alert("This name is already taken!");
+        return;
+      }
+
+      playersRef.push(name);
+      document.getElementById("username").value = "";
     }
 
-    // Listen for player list updates
-    db.ref("players").on("value", (snapshot) => {
+    // 实时监听玩家列表
+    playersRef.on("value", (snapshot) => {
       const data = snapshot.val() || {};
-      const players = Object.keys(data);
-      updatePlayerList(players);
+      currentPlayers = Object.values(data);
+      updatePlayerList(currentPlayers);
 
-      if (role === "host") {
-        document.getElementById("startBtn").disabled = players.length < 5;
-      }
+      // 如果人数 >=5，主持人可以启用开始按钮
+      document.getElementById("startBtn").disabled = currentPlayers.length < 5;
     });
 
     function updatePlayerList(players) {
-      let listEl = document.getElementById("playerList");
-      if (players.length === 0) {
-        listEl.innerHTML = "No players joined yet...";
-      } else {
-        listEl.innerHTML = `<h4>Players Joined (${players.length})</h4><ul>` + 
-          players.map(p => `<li>${p}</li>`).join("") + "</ul>";
-      }
-    }
-
-    function startGame() {
-      db.ref("players").once("value").then(snapshot => {
-        const data = snapshot.val() || {};
-        const players = Object.keys(data);
-
-        if (players.length < 5) {
-          alert("At least 5 players are required to start!");
-          return;
-        }
-        winnerIndex = Math.floor(Math.random() * players.length);
-
-        db.ref("game").set({
-          started: true,
-          winner: players[winnerIndex]
-        });
+      const list = document.getElementById("playersList");
+      list.innerHTML = "";
+      players.forEach((p) => {
+        const li = document.createElement("li");
+        li.textContent = p;
+        list.appendChild(li);
       });
     }
 
-    // Listen for game state changes
-    db.ref("game").on("value", (snapshot) => {
-      const game = snapshot.val();
-      if (!game) return;
-
-      started = game.started;
-
-      if (started) {
-        document.getElementById("result").innerHTML = "🎯 Game Started! Players, please draw!";
-        if (role === "player") {
-          document.getElementById("playerBtn").disabled = false;
-        }
+    // 主持人点击开始抽奖
+    function startDraw() {
+      if (currentPlayers.length < 5) {
+        alert("Need at least 5 players to start!");
+        return;
       }
+      const randomIndex = Math.floor(Math.random() * currentPlayers.length);
+      const winner = currentPlayers[randomIndex];
 
-      if (game.winner) {
-        if (username === game.winner) {
-          document.getElementById("result").innerHTML = `🎉 Congrats! ${username} is the Winner!`;
-          document.getElementById("result").className = "result winner";
-        } else {
-          document.getElementById("result").innerHTML = `🙏 ${game.winner} won! Thank you for playing.`;
-          document.getElementById("result").className = "result loser";
-        }
-        document.getElementById("playerBtn").disabled = true;
+      // 将赢家写入 Firebase（所有人都会同步看到）
+      winnerRef.set(winner);
+    }
+
+    // 监听赢家结果
+    winnerRef.on("value", (snapshot) => {
+      const winner = snapshot.val();
+      if (winner) {
+        document.getElementById("winnerBox").innerText = "🏆 Winner: " + winner + " 🎉";
       }
     });
-
-    function draw() {
-      document.getElementById("playerBtn").disabled = true; // one chance
-    }
-
-    function resetGame() {
-      db.ref("game").remove();
-      document.getElementById("result").innerHTML = "👉 Waiting for host to click Start";
-      document.getElementById("result").className = "result";
-    }
   </script>
 </body>
 </html>
