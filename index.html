@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Lucky Draw Game (Realtime)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 40px 20px;
+      background: linear-gradient(135deg, #f9f9f9, #e3f2fd);
+    }
+    h2 { font-size: 28px; margin-bottom: 15px; color: #333; }
+    input {
+      padding: 10px; margin: 5px; border: 1px solid #ccc;
+      border-radius: 8px; font-size: 16px; width: 200px;
+    }
+    button {
+      padding: 12px 25px; font-size: 18px; font-weight: bold;
+      border: none; border-radius: 10px; margin: 5px; cursor: pointer;
+      color: white; background-color: #42a5f5;
+    }
+    button:disabled { background-color: #aaa; cursor: not-allowed; }
+    .setup, .game, .lobby { margin-top: 20px; }
+    .host-controls button { background-color: #8e24aa; }
+    .result { margin-top: 30px; font-size: 22px; font-weight: bold; min-height: 30px; }
+    .winner { color: #2e7d32; }
+    .loser { color: #c62828; }
+    .player-list {
+      margin-top: 15px; font-size: 18px; text-align: left;
+      display: inline-block; background: #fff; padding: 15px 20px;
+      border-radius: 12px; box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+    }
+    .player-list h4 { margin: 0 0 10px 0; }
+  </style>
+</head>
+<body>
+  <h2>🎉 Lucky Draw Game 🎉</h2>
+
+  <!-- Before Game: Choose Role -->
+  <div class="setup" id="setup">
+    <h3>Enter your name and choose a role</h3>
+    <input id="username" placeholder="Your Name" />
+    <br>
+    <button onclick="setRole('host')">I am the Host</button>
+    <button onclick="setRole('player')">I am a Player</button>
+  </div>
+
+  <!-- Lobby -->
+  <div class="lobby" id="lobby" style="display:none;">
+    <h3>Game Lobby</h3>
+    <div class="player-list" id="playerList">No players joined yet...</div>
+  </div>
+
+  <!-- Game Area -->
+  <div class="game" id="game" style="display:none;">
+    <div id="hostArea" style="display:none;">
+      <h3>🎤 Host Controls</h3>
+      <div class="host-controls">
+        <button id="startBtn" onclick="startGame()" disabled>▶️ Start Game</button>
+        <button id="resetBtn" onclick="resetGame()" disabled>🔄 Reset</button>
+      </div>
+    </div>
+
+    <div id="playerArea" style="display:none;">
+      <h3>🎮 Player Zone</h3>
+      <button id="playerBtn" onclick="draw()" disabled>Draw</button>
+    </div>
+
+    <div class="result" id="result">👉 Waiting for host to click “Start”</div>
+  </div>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js"></script>
+
+  <script>
+    // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyA8sX8aPIcTpHuvWjUuLxhqKCajye569is",
+  authDomain: "luckydraw-8899c.firebaseapp.com",
+  databaseURL: "https://luckydraw-8899c-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "luckydraw-8899c",
+  storageBucket: "luckydraw-8899c.firebasestorage.app",
+  messagingSenderId: "191119108641",
+  appId: "1:191119108641:web:39a9e3a2b52140b9515160",
+  measurementId: "G-MVX5LMXPLY"
+};
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    let role = "";
+    let username = "";
+    let winnerIndex;
+    let started = false;
+
+    function setRole(selectedRole) {
+      username = document.getElementById("username").value.trim();
+      if (!username) { alert("Please enter your name"); return; }
+      role = selectedRole;
+
+      document.getElementById("setup").style.display = "none";
+      document.getElementById("lobby").style.display = "block";
+      document.getElementById("game").style.display = "block";
+
+      if (role === "host") {
+        document.getElementById("hostArea").style.display = "block";
+      } else {
+        document.getElementById("playerArea").style.display = "block";
+        document.getElementById("playerBtn").innerText = username + " - Draw";
+      }
+
+      // Add player to Firebase
+      db.ref("players/" + username).set({name: username});
+    }
+
+    // Listen for player list updates
+    db.ref("players").on("value", (snapshot) => {
+      const data = snapshot.val() || {};
+      const players = Object.keys(data);
+      updatePlayerList(players);
+
+      if (role === "host") {
+        document.getElementById("startBtn").disabled = players.length < 5;
+      }
+    });
+
+    function updatePlayerList(players) {
+      let listEl = document.getElementById("playerList");
+      if (players.length === 0) {
+        listEl.innerHTML = "No players joined yet...";
+      } else {
+        listEl.innerHTML = `<h4>Players Joined (${players.length})</h4><ul>` + 
+          players.map(p => `<li>${p}</li>`).join("") + "</ul>";
+      }
+    }
+
+    function startGame() {
+      db.ref("players").once("value").then(snapshot => {
+        const data = snapshot.val() || {};
+        const players = Object.keys(data);
+
+        if (players.length < 5) {
+          alert("At least 5 players are required to start!");
+          return;
+        }
+        winnerIndex = Math.floor(Math.random() * players.length);
+
+        db.ref("game").set({
+          started: true,
+          winner: players[winnerIndex]
+        });
+      });
+    }
+
+    // Listen for game state changes
+    db.ref("game").on("value", (snapshot) => {
+      const game = snapshot.val();
+      if (!game) return;
+
+      started = game.started;
+
+      if (started) {
+        document.getElementById("result").innerHTML = "🎯 Game Started! Players, please draw!";
+        if (role === "player") {
+          document.getElementById("playerBtn").disabled = false;
+        }
+      }
+
+      if (game.winner) {
+        if (username === game.winner) {
+          document.getElementById("result").innerHTML = `🎉 Congrats! ${username} is the Winner!`;
+          document.getElementById("result").className = "result winner";
+        } else {
+          document.getElementById("result").innerHTML = `🙏 ${game.winner} won! Thank you for playing.`;
+          document.getElementById("result").className = "result loser";
+        }
+        document.getElementById("playerBtn").disabled = true;
+      }
+    });
+
+    function draw() {
+      document.getElementById("playerBtn").disabled = true; // one chance
+    }
+
+    function resetGame() {
+      db.ref("game").remove();
+      document.getElementById("result").innerHTML = "👉 Waiting for host to click Start";
+      document.getElementById("result").className = "result";
+    }
+  </script>
+</body>
+</html>
